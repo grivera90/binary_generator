@@ -1,0 +1,25 @@
+Para compilar este programa en C debemos hacer en una terminal: 
+
+	gcc binary_generator.c -o binary_generator
+
+Para ejecutarlo tenemos que hacer lo siguiente: 
+1) para obtener una tabla binaria con datos de relleno 0x55 y 0xAA debemos hacer: 
+	
+	./binary_generator -f <file> <index> // donde <file> es el nombre que recibira el archivo e <index> es un numero cualquier de un digito para simular el indice que apunta a una de las 3 placas.
+
+	El archivo que generemos se guarda en el directorio workingdir/ de la carpeta de este programa.
+
+2) Para enviar la tabla por tcp debemos tener conectada la placa y asegurarnos de que tenga ping. 
+	IP Server (PLACA STM32F4) 10.255.255.210
+	PORT SERVER 7
+
+	Entonces en una terminal en el directorio del compilado debemos hacer:
+
+	./binary_generator -tcp 10.255.255.210 7 <nombre_del_archivo_previamente_generado>
+
+
+gcc (Ubuntu 11.4.0-1ubuntu1~22.04) 11.4.0
+Copyright (C) 2021 Free Software Foundation, Inc.
+This is free software; see the source for copying conditions.  There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+
