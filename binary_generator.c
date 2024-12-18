@@ -32,7 +32,7 @@
 ******************************************************************************/
 #define SERVER_ADDRESS "10.255.255.210" /* Server IP */
 #define PORT 7 
-#define MAX_RAW_DATA_TABLE_LENGHT			(20 + 2) // ((256 * 20) + 2)
+#define MAX_RAW_DATA_TABLE_LENGHT			((256 * 20) + 2)
 /******************************************************************************
     Data types
 ******************************************************************************/
@@ -75,6 +75,8 @@ static void format_table_2(uint8_t *data_dst, uint8_t *data_0, uint8_t *data_1, 
 static void print_result_table(void);
 static void print_row_result_table(uint16_t row, format_print_t format);
 static void print_binary(uint8_t byte);
+static int connect_to_tcp_server(const char *ip, uint16_t port, int *socketfd);
+static int tcp_arg_handler(int argc, char **argv);
 /******************************************************************************
     Local function definitions
 ******************************************************************************/
@@ -371,4 +373,89 @@ void print_binary(uint8_t byte)
         char bin = (((byte << i) & 0x80) == 0x80) ? '1' : '0';
         printf("%c ", bin);
     }
+}
+
+static int connect_to_tcp_server(const char *ip, uint16_t port, int *socketfd)
+{
+    struct sockaddr_in server_addr = {0};
+    *socketfd = socket(AF_INET, SOCK_STREAM, 0);
+    if(-1 == *socketfd)
+    {
+        fprintf(stderr, "[SERVER-error]: socket creation failed. %d: %s \n", errno, strerror( errno ));
+        return EXIT_FAILURE;        
+    }
+
+    /* assign IP, PORT */
+    server_addr.sin_family = AF_INET; 
+    server_addr.sin_addr.s_addr = inet_addr(ip); 
+    server_addr.sin_port = htons(port); 
+    
+    if(0 != connect(*socketfd, (struct sockaddr *)&server_addr, sizeof(server_addr)))
+    {
+        fprintf(stderr, "[SERVER-error]: socket creation failed. %d: %s \n", errno, strerror( errno ));
+        return EXIT_FAILURE;  
+    }
+
+    printf("connected to the server..\n"); 
+    return EXIT_SUCCESS;    
+}
+
+static int tcp_arg_handler(int argc, char **argv)
+{
+    int socketfd = 0;
+
+    if (0 != connect_to_tcp_server(argv[2], atoi(argv[3]), &socketfd))
+    {
+        return EXIT_FAILURE;
+    }
+
+    int files = (argc - 3); 
+    for (int c = 0; c < files; c++)
+    {
+        sprintf(file_path, "workingdir/%s", argv[4 + c]);
+        FILE *fp = fopen(file_path, "r");
+        if (NULL == fp)
+        {
+            fprintf(stderr, "[FILE-error]: open failed. %d: %s\n", errno, strerror(errno));
+            fclose(fp);
+            close(socketfd);
+            return EXIT_FAILURE;
+        }  
+
+        fseek(fp, 0L, SEEK_END);
+        unsigned long size_in_bytes = ftell(fp);
+        printf("%ld bytes read\n", size_in_bytes);
+        fseek(fp, 0L, SEEK_SET);
+
+        unsigned long rbytes = fread(&file_data[0], sizeof(char), size_in_bytes, fp);
+        if (rbytes != size_in_bytes)
+        {
+            printf("read file error\n");
+            return EXIT_FAILURE;       
+        }
+
+        size_t total_sent = 0;
+        ssize_t sent;
+        
+        while (total_sent < rbytes) 
+        {
+            sent = write(socketfd, file_data + total_sent, rbytes - total_sent);
+            if (sent == -1) 
+            {
+                fprintf(stderr, "[SERVER-error]: write failed. %d: %s\n", errno, strerror(errno));
+                fclose(fp);
+                close(socketfd);
+                return EXIT_FAILURE;
+            }
+
+            total_sent += sent;
+        }
+
+        fclose(fp);
+        printf("CLIENT: Sent %ld bytes successfully.\n", total_sent); 
+    }
+
+    close(socketfd);
+
+    return EXIT_SUCCESS;
 }
