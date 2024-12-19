@@ -35,7 +35,9 @@
 #define SERVER_ADDRESS "10.255.255.210" /* Server IP */
 #define PORT 7 
 #define MAX_RAW_DATA_TABLE_LENGHT			((256 * 20) + 2)
-#define OPTIONS                             (3)
+#define MAX_RAW_CAL_TABLE_LENGHT            (20 + 2)
+#define OPTIONS                             (5)
+#define DEFAUTL_FILES_COUNT                 (6)
 /******************************************************************************
     Data types
 ******************************************************************************/
@@ -77,9 +79,21 @@ static table_t raw_table_type = {0};
 
 static cmd_t commands[OPTIONS] = 
 {
-    {"-f", NULL},
-    {"-g", NULL},
-    {"-tcp", NULL}
+    { "-f",     NULL},
+    { "-fc",    NULL},
+    { "-g",     NULL},
+    { "-tcp",   NULL},
+    { "-send",   NULL}
+};
+
+static const char *files_name[6] = 
+{
+    "workingdir/data_table_0x55_AA_0.bin",
+    "workingdir/data_table_0x55_AA_1.bin",
+    "workingdir/data_table_0x55_AA_2.bin",
+    "workingdir/cal_table_0x01_0.bin",
+    "workingdir/cal_table_0x01_1.bin",
+    "workingdir/cal_table_0x01_2.bin"
 };
 /******************************************************************************
     Local function prototypes
@@ -93,7 +107,9 @@ static void print_row_result_table(uint16_t row, format_print_t format);
 static void print_binary(uint8_t byte);
 static int connect_to_tcp_server(const char *ip, uint16_t port, int *socketfd);
 static int tcp_arg_handler(int argc, char **argv);
+static int tcp_send_data_cal(int argc, char **argv);
 static int file_arg_handler(int argc, char **argv);
+static int file_data_cal_generation(int argc, char **argv);
 static int print_generic_cpld_table(int argc, char **argv);
 static bool is_number_valid(char *str, int n);
 static bool is_file_name_valid(char *str, int n);
@@ -110,8 +126,10 @@ int main(int argc, char **argv)
     printf("binary generator run\r\n");
 
     commands[0].cmd_func = file_arg_handler;
-    commands[1].cmd_func = print_generic_cpld_table;
-    commands[2].cmd_func = tcp_arg_handler;
+    commands[1].cmd_func = file_data_cal_generation;
+    commands[2].cmd_func = print_generic_cpld_table;
+    commands[3].cmd_func = tcp_arg_handler;
+    commands[4].cmd_func = tcp_send_data_cal;
 
     dispatcher(commands, argv[1], argc, argv);
 
@@ -348,7 +366,76 @@ static int tcp_arg_handler(int argc, char **argv)
 
         fclose(fp);
         printf("CLIENT: Sent file %d, %ld bytes successfully.\n", (c + 1), total_sent); 
-        sleep(1);
+        // sleep(1);
+        usleep(500000);
+    }
+
+    close(socketfd);
+
+    return EXIT_SUCCESS;
+}
+
+static int tcp_send_data_cal(int argc, char **argv)
+{
+    int socketfd = 0;
+    int files = 0;
+    int c = 0;
+
+    /* Se crean los archivos a mandar */
+    file_data_cal_generation(argc, argv);
+
+    if (0 != connect_to_tcp_server(argv[2], atoi(argv[3]), &socketfd))
+    {
+        return EXIT_FAILURE;
+    }
+
+    printf("Sending files to TCP Server\r\n");
+
+    for (c = 0; c < DEFAUTL_FILES_COUNT; c++)
+    {
+        sprintf(file_path, "%s", files_name[c]);
+        FILE *fp = fopen(file_path, "r");
+        if (NULL == fp)
+        {
+            fprintf(stderr, "[FILE-error]: open failed. %d: %s\n", errno, strerror(errno));
+            fclose(fp);
+            close(socketfd);
+            return EXIT_FAILURE;
+        }  
+
+        fseek(fp, 0L, SEEK_END);
+        unsigned long size_in_bytes = ftell(fp);
+        printf("%ld bytes read\n", size_in_bytes);
+        fseek(fp, 0L, SEEK_SET);
+
+        unsigned long rbytes = fread(&file_data[0], sizeof(char), size_in_bytes, fp);
+        if (rbytes != size_in_bytes)
+        {
+            printf("read file error\n");
+            return EXIT_FAILURE;       
+        }
+
+        size_t total_sent = 0;
+        ssize_t sent;
+        
+        while (total_sent < rbytes) 
+        {
+            sent = write(socketfd, file_data + total_sent, rbytes - total_sent);
+            if (sent == -1) 
+            {
+                fprintf(stderr, "[SERVER-error]: write failed. %d: %s\n", errno, strerror(errno));
+                fclose(fp);
+                close(socketfd);
+                return EXIT_FAILURE;
+            }
+
+            total_sent += sent;
+        }
+
+        fclose(fp);
+        printf("CLIENT: Sent %s, %ld bytes successfully.\n", file_path, total_sent); 
+        // sleep(1);
+        usleep(500000);
     }
 
     close(socketfd);
@@ -408,6 +495,72 @@ static int file_arg_handler(int argc, char **argv)
         c += 2;
     } 
 
+    return EXIT_SUCCESS;
+}
+
+static int file_data_cal_generation(int argc, char **argv)
+{
+    int files = 0;
+    uint8_t toggle = 0;
+    char data = 0;
+
+    /* Crea 3 tablas de datos genericas */
+    for (files = 0; files < 3; files++)
+    {
+        // sprintf(file_path, "workingdir/data_table_0x55_0xAA_%c.bin", (files + 0x30));
+        sprintf(file_path, "%s", files_name[files]);
+        FILE *fp = fopen(file_path, "wb");
+        if (NULL == fp)
+        {
+            fprintf(stderr, "[FILE-error]: open failed. %d: %s\n", errno, strerror(errno));
+            fclose(fp);
+            return EXIT_FAILURE;
+        }
+
+        char table_type = 'D';
+        char index = '0' + files;
+        fwrite(&table_type, sizeof(table_type), 1, fp);     // indicador del tipo de tabla.
+        fwrite(&index, sizeof(index), 1, fp);               // Indice que apunta a la placa (RX1, RX2 y TX).
+
+        for (int i = 0; i < MAX_RAW_DATA_TABLE_LENGHT - 2; i++)
+        {
+            data = (toggle == 1) ? 0x55 : 0xAA;
+            fwrite(&data, sizeof(data), 1, fp);
+            toggle ^= 1;
+        }
+
+        printf("Data %s file ok\r\n", file_path);
+        fclose(fp);
+    }
+    
+    /* Crea 3 tablas de calibracion con 0x01 */
+    for (files = 0; files < 3; files++)
+    {
+        sprintf(file_path, "workingdir/cal_table_0x01_%c.bin", (files + 0x30));
+        FILE *fp = fopen(file_path, "wb");
+        if (NULL == fp)
+        {
+            fprintf(stderr, "[FILE-error]: open failed. %d: %s\n", errno, strerror(errno));
+            fclose(fp);
+            return EXIT_FAILURE;
+        }
+
+        char table_type = 'C';
+        char index = '0' + files;
+        fwrite(&table_type, sizeof(table_type), 1, fp);     // indicador del tipo de tabla.
+        fwrite(&index, sizeof(index), 1, fp);               // Indice que apunta a la placa (RX1, RX2 y TX).
+
+        for (int i = 0; i < MAX_RAW_CAL_TABLE_LENGHT - 2; i++)
+        {
+            data = 0x01;
+            fwrite(&data, sizeof(data), 1, fp);
+        }
+
+        printf("Calibration %s file ok\r\n", file_path);
+        fclose(fp);
+    }
+
+    /* Fin */
     return EXIT_SUCCESS;
 }
 
