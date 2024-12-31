@@ -80,7 +80,7 @@ static table_t raw_table_type = {0};
 static cmd_t commands[OPTIONS] = 
 {
     { "-f",     NULL},
-    { "-fc",    NULL},
+    { "-fdc",    NULL},
     { "-g",     NULL},
     { "-tcp",   NULL},
     { "-send",   NULL}
@@ -252,8 +252,6 @@ static void print_row_result_table(uint16_t row, format_print_t format)
 
     for (int col = 0; col < 240; col++)
     {
-        
-        
         if (PRINT_HEX == format)
         {
             printf("0x%02X ", result_table[row][col]);
@@ -265,6 +263,7 @@ static void print_row_result_table(uint16_t row, format_print_t format)
 
         c++;
         printf(" | ");
+        
         if (6 == c)
         {
             c = 0;
@@ -434,7 +433,6 @@ static int tcp_send_data_cal(int argc, char **argv)
 
         fclose(fp);
         printf("CLIENT: Sent %s, %ld bytes successfully.\n", file_path, total_sent); 
-        // sleep(1);
         usleep(500000);
     }
 
@@ -566,7 +564,6 @@ static int file_data_cal_generation(int argc, char **argv)
 
 static int print_generic_cpld_table(int argc, char **argv)
 {
-    // genera una tabla generica con 0xAA y 0x55 de salida para los CPLD.
     printf("print_generic_cpld_table\r\n");
     
     int params = argc - 2;
