@@ -10,12 +10,19 @@ This repository contains a program to generate somes generic binary files with 0
 # Use
 ## Generate a generic table (-f)
     
-  To get a file .bin with a table with 0x55 and 0xAA of data fill you should to do:
+  This command create a file with a table with 0x55 and 0xAA of data fill
 
     ./binary_generator -f <file> <index>"
 
-    Eg: ./binary_generator -f test.bin 0
+  E.g: 
+    
+    ./binary_generator -f my_file.bin 0
 
+  Print:
+    
+    binary generator run
+    my_file.bin ok
+  
   Where "< file >" is the name file that you asign to the generated file and "< index >" is the number of the board asigned related with the table. It Can be 0, 1 and 2.
 
 ## Generate a 3 data tables and 3 calibration tables (-fdc)
@@ -52,7 +59,7 @@ This repository contains a program to generate somes generic binary files with 0
 
     ./binary_generator -g <rows> <columns>
   
-  Eg:
+  E.g:
   
     ./binary_generator -g 256 20
     
@@ -76,7 +83,7 @@ This repository contains a program to generate somes generic binary files with 0
 
     ./binary_generator -tcp <IP> <PORT> <file_name_1> ... <file_name_n>
   
-  Eg:
+  E.g:
 
     ./binary_generator -tcp 192.168.56.1 7 test_0.bin test_1.bin
   
@@ -96,9 +103,9 @@ This repository contains a program to generate somes generic binary files with 0
 
     ./binary_generator -send <IP> <PORT>
   
-  Eg: 
+  E.g: 
   
-    ./binary_generator -tcp 192.168.56.1 7
+    ./binary_generator -send 192.168.56.1 7
 
   print:
 
