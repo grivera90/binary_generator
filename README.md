@@ -25,7 +25,7 @@ This repository contains a program to generate somes generic binary files with 0
   
   Where "< file >" is the name file that you asign to the generated file and "< index >" is the number of the board asigned related with the table. It Can be 0, 1 and 2.
 
-## Generate a 3 data tables and 3 calibration tables (-fdc)
+## Generate three data and calibration tables (-fdc)
 
   This command generate three data and calibration tables with 0x55 and 0xAA of data fill to data table and 0x01 to calibration tables.
 
